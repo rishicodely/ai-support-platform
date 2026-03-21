@@ -1,0 +1,21 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["ticket_schema"]
+}
+
+model Ticket {
+  id           String   @id @default(uuid())
+  subject      String
+  priority     String
+  status       String   @default("OPEN")
+  category     String?
+  aiConfidence Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@schema("ticket_schema")
+}
