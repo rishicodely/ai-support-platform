@@ -1,21 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { connect, Connection, Channel } from 'amqplib';
-import { randomUUID } from 'crypto';
-
-interface EventPayload {
-  ticket_id: string;
-  tenant_id?: string;
-}
-
-interface EventEnvelope {
-  event_id: string;
-  event_type: string;
-  aggregate_id: string;
-  tenant_id: string;
-  timestamp: string;
-  version: number;
-  payload: EventPayload;
-}
+import { EventEnvelope } from './types/event.types';
 
 @Injectable()
 export class RabbitMQService implements OnModuleInit {
@@ -25,44 +13,31 @@ export class RabbitMQService implements OnModuleInit {
   private readonly EXCHANGE = 'support.events';
 
   async onModuleInit(): Promise<void> {
-    try {
-      this.connection = await connect(
-        `amqp://support_user:support_password@localhost:5672`,
-      );
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-      const channel: Channel = await this.connection.createChannel();
-      this.channel = channel;
-      await this.channel.assertExchange(this.EXCHANGE, 'topic', {
-        durable: true,
-      });
+    this.connection = await connect(
+      'amqp://support_user:support_password@localhost:5672',
+    );
 
-      console.log('RabbitMQ connected');
-    } catch (error) {
-      console.error('Failed to initialize RabbitMQ:', error);
-      throw error;
-    }
+    this.channel = await this.connection.createChannel();
+
+    await this.channel.assertExchange(this.EXCHANGE, 'topic', {
+      durable: true,
+    });
+
+    console.log('RabbitMQ connected');
   }
 
-  publish(eventType: string, payload: EventPayload): void {
+  publish(routingKey: string, event: EventEnvelope): void {
     if (!this.channel) {
       throw new Error('RabbitMQ channel not initialized');
     }
-    const event: EventEnvelope = {
-      event_id: randomUUID(),
-      event_type: eventType,
-      aggregate_id: payload.ticket_id,
-      tenant_id: payload.tenant_id ?? 'default-tenant',
-      timestamp: new Date().toISOString(),
-      version: 1,
-      payload,
-    };
 
     this.channel.publish(
       this.EXCHANGE,
-      eventType,
+      routingKey,
       Buffer.from(JSON.stringify(event)),
       { persistent: true },
     );
-    console.log('Event published:', eventType);
+
+    console.log('[EVENT PUBLISHED]', routingKey);
   }
 }

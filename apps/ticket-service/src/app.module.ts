@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { RabbitMQService } from './messaging/rabbitmq.service';
 import { PrismaService } from './prisma/prisma.service';
 import { ConfigModule } from '@nestjs/config';
+import { AIConsumer } from './messaging/ai.consumer';
 
 @Module({
   imports: [
@@ -11,6 +12,6 @@ import { ConfigModule } from '@nestjs/config';
     }),
   ],
   controllers: [AppController],
-  providers: [RabbitMQService, PrismaService],
+  providers: [RabbitMQService, PrismaService, AIConsumer],
 })
 export class AppModule {}

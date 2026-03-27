@@ -14,7 +14,10 @@ DLQ = "ai.dlq"
 def classify_ticket(text: str):
     text = text.lower()
 
-    if "payment" in text or "billing" in text:
+    # if "payment" in text or "billing" in text:
+    #     return "billing", 0.92
+
+    if "payment" in text or "billing" in text or "issue" in text:
         return "billing", 0.92
 
     if "login" in text or "password" in text:
@@ -71,7 +74,7 @@ def start_consumer():
             "event_id": event["event_id"],
             "event_type": "ticket.ai_processed",
             "aggregate_id": event["aggregate_id"],
-            "tenant_id": event["tenant_id"],
+            "tenant_id": event.get("tenant_id", "default-tenant"),
             "timestamp": event["timestamp"],
             "version": 1,
             "payload": {
@@ -96,7 +99,7 @@ def start_consumer():
             print("AI Service received:", event["event_type"])
 
             # simulate failure
-            if random.choice([True, False]):
+            if random.random() < 0.3:  # 30% failure
                 raise Exception("Simulated AI failure")
 
             # extract subject

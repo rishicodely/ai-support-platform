@@ -1,0 +1,82 @@
+import { useEffect, useState } from "react";
+
+type Ticket = {
+  id: string;
+  subject: string;
+  status: string;
+  category: string | null;
+  aiConfidence: number | null;
+};
+
+function getStatusColor(status: string) {
+  if (status === "CLASSIFIED") return "bg-green-500 text-black";
+  if (status === "PROCESSING") return "bg-yellow-400 text-black";
+  return "bg-red-500 text-white";
+}
+
+function App() {
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+
+  useEffect(() => {
+    const fetchTickets = async () => {
+      const res = await fetch("http://localhost:3002/tickets");
+      const data = await res.json();
+      setTickets(data);
+    };
+    fetchTickets();
+    const interval = setInterval(fetchTickets, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-gray-200 p-8">
+      <h1 className="text-2xl font-semibold mb-6">AI Support Dashboard</h1>
+
+      <div className="bg-slate-800 rounded-xl overflow-hidden shadow-lg">
+        <table className="w-full">
+          <thead className="bg-black/40 text-gray-400 text-sm">
+            <tr>
+              <th className="p-3 text-left">ID</th>
+              <th className="p-3 text-left">Subject</th>
+              <th className="p-3 text-left">Status</th>
+              <th className="p-3 text-left">Category</th>
+              <th className="p-3 text-left">Confidence</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {tickets.map((t) => (
+              <tr
+                key={t.id}
+                className="border-t border-slate-700 hover:bg-slate-700/30 transition"
+              >
+                <td className="p-3">{t.id.slice(0, 8)}</td>
+                <td className="p-3">{t.subject}</td>
+
+                <td className="p-3">
+                  <span
+                    className={`px-2 py-1 rounded-md text-sm font-medium ${getStatusColor(
+                      t.status,
+                    )}`}
+                  >
+                    {t.status}
+                  </span>
+                </td>
+
+                <td className="p-3">{t.category || "-"}</td>
+
+                <td className="p-3">
+                  {t.aiConfidence
+                    ? `${(t.aiConfidence * 100).toFixed(0)}%`
+                    : "-"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export default App;
