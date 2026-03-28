@@ -12,7 +12,7 @@ export class AIConsumer implements OnModuleInit {
   private channel: any;
 
   private readonly EXCHANGE = 'support.events';
-  private readonly QUEUE = 'ticket.ai.queue';
+  private readonly QUEUE = 'ticket.result.queue';
 
   constructor(private prisma: PrismaService) {}
 
@@ -35,6 +35,8 @@ export class AIConsumer implements OnModuleInit {
       'ticket.ai_processed',
     );
 
+    await this.channel.bindQueue(this.QUEUE, this.EXCHANGE, 'ticket.ai_failed');
+
     await this.channel.consume(this.QUEUE, async (msg: any) => {
       if (!msg) return;
 
@@ -44,7 +46,25 @@ export class AIConsumer implements OnModuleInit {
         console.log('Ticket Service received:', event.event_type);
 
         const ticketId = event.aggregate_id;
-        const { category, confidence } = event.payload;
+
+        // ✅ HANDLE FAILURE FIRST
+        if (event.event_type === 'ticket.ai_failed') {
+          await this.prisma.ticket.update({
+            where: { id: ticketId },
+            data: {
+              status: 'FAILED',
+            },
+          });
+
+          console.log(`Ticket ${ticketId} marked FAILED`);
+
+          this.channel.ack(msg);
+          return;
+        }
+
+        // ✅ SUCCESS CASE
+        const category = event?.payload?.category ?? null;
+        const confidence = event?.payload?.confidence ?? null;
 
         await this.prisma.ticket.update({
           where: { id: ticketId },
@@ -60,10 +80,10 @@ export class AIConsumer implements OnModuleInit {
         this.channel.ack(msg);
       } catch (err) {
         console.error('Failed to process AI result', err);
-        this.channel.nack(msg, false, false);
+
+        this.channel.nack(msg, false, true);
       }
     });
-
     console.log('AI consumer started in ticket-service');
   }
 }

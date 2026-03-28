@@ -96,7 +96,34 @@ def start_consumer():
     def callback(ch, method, properties, body):
         try:
             event = json.loads(body)
+            headers = properties.headers or {}
+            x_death = headers.get("x-death", [])
+            retry_count = x_death[0]["count"] if x_death else 0
+
+            if retry_count >= 3:
+                print("Max retries reached → dropping message")
+                failure_event = {
+                    "event_id": event["event_id"],
+                    "event_type": "ticket.ai_failed",
+                    "aggregate_id": event["aggregate_id"],
+                    "tenant_id": event.get("tenant_id", "default-tenant"),
+                    "timestamp": event["timestamp"],
+                    "version": 1,
+                    "payload": {}
+                }
+
+                channel.basic_publish(
+                    exchange=EXCHANGE,
+                    routing_key="ticket.ai_failed",
+                    body=json.dumps(failure_event),
+                    properties=pika.BasicProperties(delivery_mode=2)
+               )
+                
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+                return
+            
             print("AI Service received:", event["event_type"])
+            print(f"[RETRY {retry_count}] Processing ticket {event['aggregate_id']}")
 
             # simulate failure
             if random.random() < 0.3:  # 30% failure
