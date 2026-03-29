@@ -18,9 +18,14 @@ function App() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [subject, setSubject] = useState("");
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("ALL");
 
   const fetchTickets = async () => {
-    const res = await fetch("http://localhost:3002/tickets");
+    const url =
+      status === "ALL"
+        ? "http://localhost:3002/tickets"
+        : `http://localhost:3002/tickets?status=${status}`;
+    const res = await fetch(url);
     const data = await res.json();
     setTickets(data);
   };
@@ -29,7 +34,7 @@ function App() {
     fetchTickets();
     const interval = setInterval(fetchTickets, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [status]);
 
   const createTicket = async () => {
     if (!subject.trim()) return;
@@ -78,6 +83,20 @@ function App() {
         >
           {loading ? "Creating..." : "Create"}
         </button>
+      </div>
+
+      <div className="flex gap-2 mb-4">
+        {["ALL", "PROCESSING", "CLASSIFIED", "FAILED"].map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatus(s)}
+            className={`px-3 py-1 rounded-md text-sm ${
+              status === s ? "bg-blue-600" : "bg-slate-700 hover:bg-slate-600"
+            }`}
+          >
+            {s}
+          </button>
+        ))}
       </div>
 
       {/* ✅ TABLE */}

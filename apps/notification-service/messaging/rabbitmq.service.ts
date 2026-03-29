@@ -19,6 +19,7 @@ export class RabbitMQService implements OnModuleInit {
       );
 
       this.channel = await this.connection.createChannel();
+      await this.channel.prefetch(1);
 
       await this.channel.assertExchange(this.EXCHANGE, 'topic', {
         durable: true,
@@ -34,15 +35,49 @@ export class RabbitMQService implements OnModuleInit {
         'ticket.ai_processed',
       );
 
-      await this.channel.consume(this.QUEUE, (msg: any) => {
+      await this.channel.bindQueue(
+        this.QUEUE,
+        this.EXCHANGE,
+        'ticket.ai_failed',
+      );
+
+      await this.channel.consume(this.QUEUE, async (msg: any) => {
         if (!msg) return;
 
-        const event = JSON.parse(msg.content.toString());
+        try {
+          const event = JSON.parse(msg.content.toString());
+          const ticketId = event.aggregate_id;
 
-        console.log('Notification Service received:', event.event_type);
-        console.log('Payload:', event.payload);
+          if (event.event_type === 'ticket.ai_processed') {
+            console.log(`
+==============================
+📩 NOTIFICATION SERVICE
+✅ Ticket Classified
+Ticket ID: ${ticketId}
+Category: ${event.payload?.category}
+Confidence: ${event.payload?.confidence}
+==============================
+      `);
+          }
 
-        this.channel.ack(msg);
+          if (event.event_type === 'ticket.ai_failed') {
+            console.log(`
+==============================
+🚨 NOTIFICATION SERVICE
+❌ Ticket Processing Failed
+Ticket ID: ${ticketId}
+Action: Manual review required
+==============================
+      `);
+          }
+
+          this.channel.ack(msg);
+        } catch (error) {
+          console.error('Notification processing failed:', error);
+
+          // do NOT requeue → avoid infinite loops
+          this.channel.nack(msg, false, false);
+        }
       });
 
       console.log('Notification consumer started');
