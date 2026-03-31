@@ -5,6 +5,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import * as amqp from 'amqplib';
 import { PrismaService } from '../prisma/prisma.service';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 @Injectable()
 export class AIConsumer implements OnModuleInit {
@@ -17,9 +20,7 @@ export class AIConsumer implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    this.connection = await amqp.connect(
-      'amqp://support_user:support_password@localhost:5672',
-    );
+    this.connection = await amqp.connect(process.env.RABBITMQ_URL);
 
     this.channel = await this.connection.createChannel();
 

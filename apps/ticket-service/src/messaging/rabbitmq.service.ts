@@ -4,6 +4,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { connect, Connection, Channel } from 'amqplib';
 import { EventEnvelope } from './types/event.types';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 @Injectable()
 export class RabbitMQService implements OnModuleInit {
@@ -13,9 +16,7 @@ export class RabbitMQService implements OnModuleInit {
   private readonly EXCHANGE = 'support.events';
 
   async onModuleInit(): Promise<void> {
-    this.connection = await connect(
-      'amqp://support_user:support_password@localhost:5672',
-    );
+    this.connection = await connect(process.env.RABBITMQ_URL);
 
     this.channel = await this.connection.createChannel();
 

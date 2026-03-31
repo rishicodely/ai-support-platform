@@ -3,6 +3,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { connect } from 'amqplib';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 @Injectable()
 export class RabbitMQService implements OnModuleInit {
@@ -14,9 +17,11 @@ export class RabbitMQService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     try {
-      this.connection = await connect(
-        'amqp://support_user:support_password@localhost:5672',
-      );
+      const rabbitmqUrl = process.env.RABBITMQ_URL;
+      if (!rabbitmqUrl) {
+        throw new Error('RABBITMQ_URL environment variable is not defined');
+      }
+      this.connection = await connect(rabbitmqUrl);
 
       this.channel = await this.connection.createChannel();
       await this.channel.prefetch(1);
@@ -41,7 +46,7 @@ export class RabbitMQService implements OnModuleInit {
         'ticket.ai_failed',
       );
 
-      await this.channel.consume(this.QUEUE, async (msg: any) => {
+      await this.channel.consume(this.QUEUE, (msg: any) => {
         if (!msg) return;
 
         try {

@@ -1,8 +1,13 @@
 import json
+import os
+import urllib.parse
 import pika
 from fastapi import FastAPI
 import threading
 import random
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -32,12 +37,12 @@ def classify_ticket(text: str):
     return "general", 0.70
 
 def start_consumer():
-    connection = pika.BlockingConnection(
-        pika.ConnectionParameters(
-            host="localhost",
-            credentials=pika.PlainCredentials("support_user", "support_password")
-        )
-    )
+    url = os.getenv("RABBITMQ_URL")
+    params = pika.URLParameters(url)
+    params.heartbeat = 600
+    params.blocked_connection_timeout = 300
+
+    connection = pika.BlockingConnection(params)
 
     channel = connection.channel()
     channel.exchange_declare(exchange=EXCHANGE, exchange_type="topic", durable=True)
