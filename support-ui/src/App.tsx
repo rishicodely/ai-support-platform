@@ -23,8 +23,8 @@ function App() {
   const fetchTickets = async () => {
     const url =
       status === "ALL"
-        ? "http://localhost:3002/tickets"
-        : `http://localhost:3002/tickets?status=${status}`;
+        ? "https://ticket-service-nx7h.onrender.com/tickets"
+        : `https://ticket-service-nx7h.onrender.com/tickets?status=${status}`;
     const res = await fetch(url);
     const data = await res.json();
     setTickets(data);
@@ -42,7 +42,7 @@ function App() {
     try {
       setLoading(true);
 
-      await fetch("http://localhost:3002/tickets", {
+      await fetch("https://ticket-service-nx7h.onrender.com/tickets", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
