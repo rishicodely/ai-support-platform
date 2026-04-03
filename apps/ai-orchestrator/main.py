@@ -1,4 +1,3 @@
-from email.mime import text
 import json
 import os
 import urllib.parse
@@ -19,9 +18,11 @@ QUEUE = "ai.queue"
 RETRY_QUEUE = "ai.retry.queue"
 DLQ = "ai.dlq"
 
-from groq import Groq
+api_key = os.getenv("GROQ_API_KEY")
+if not api_key:
+    raise Exception("GROQ_API_KEY missing")
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = Groq(api_key=api_key)
 
 def classify_with_groq(text: str):
     response = client.chat.completions.create(
@@ -64,6 +65,9 @@ Return ONLY JSON:
 def start_consumer():
     try:
         url = os.getenv("RABBITMQ_URL")
+        if not url:
+            raise Exception("RABBITMQ_URL missing")
+
         params = pika.URLParameters(url)
         params.heartbeat = 600
         params.blocked_connection_timeout = 300
