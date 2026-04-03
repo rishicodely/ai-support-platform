@@ -62,42 +62,47 @@ Return ONLY JSON:
         return "general", 0.5
 
 def start_consumer():
-    url = os.getenv("RABBITMQ_URL")
-    params = pika.URLParameters(url)
-    params.heartbeat = 600
-    params.blocked_connection_timeout = 300
+    try:
+        url = os.getenv("RABBITMQ_URL")
+        params = pika.URLParameters(url)
+        params.heartbeat = 600
+        params.blocked_connection_timeout = 300
 
-    connection = pika.BlockingConnection(params)
+        connection = pika.BlockingConnection(params)
+        channel = connection.channel()
 
-    channel = connection.channel()
-    channel.exchange_declare(exchange=EXCHANGE, exchange_type="topic", durable=True)
+        channel.exchange_declare(exchange=EXCHANGE, exchange_type="topic", durable=True)
 
-    # DLQ
-    channel.queue_declare(queue=DLQ, durable=True)
+        # DLQ
+        channel.queue_declare(queue=DLQ, durable=True)
 
-    # Retry Queue
-    channel.queue_declare(
-        queue=RETRY_QUEUE,
-        durable=True,
-        arguments={
-            "x-dead-letter-exchange": EXCHANGE,
-            "x-dead-letter-routing-key": "ticket.created",
-            "x-message-ttl": 5000
-        }
-    )
+        # Retry Queue
+        channel.queue_declare(
+            queue=RETRY_QUEUE,
+            durable=True,
+            arguments={
+                "x-dead-letter-exchange": EXCHANGE,
+                "x-dead-letter-routing-key": "ticket.created",
+                "x-message-ttl": 5000,
+            },
+        )
 
-    # Main Queue
-    channel.queue_declare(
-        queue=QUEUE,
-        durable=True,
-        arguments={
-            "x-dead-letter-exchange": "",
-            "x-dead-letter-routing-key": RETRY_QUEUE
-        }
-    )
+        # Main Queue
+        channel.queue_declare(
+            queue=QUEUE,
+            durable=True,
+            arguments={
+                "x-dead-letter-exchange": "",
+                "x-dead-letter-routing-key": RETRY_QUEUE,
+            },
+        )
 
-    channel.queue_bind(exchange=EXCHANGE, queue=QUEUE, routing_key="ticket.created")
+        channel.queue_bind(exchange=EXCHANGE, queue=QUEUE, routing_key="ticket.created")
 
+    except Exception as e:
+        print("🔥 RABBIT INIT FAILED:", e)
+        return
+    
     # ✅ publisher
     def publish_ai_processed(event, category, confidence):
         response_event = {
