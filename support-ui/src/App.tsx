@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { io } from "socket.io-client";
 
 type Ticket = {
   id: string;
@@ -25,14 +26,51 @@ function App() {
       status === "ALL"
         ? "https://ticket-service-nx7h.onrender.com/tickets"
         : `https://ticket-service-nx7h.onrender.com/tickets?status=${status}`;
+
     const res = await fetch(url);
     const data = await res.json();
     setTickets(data);
   };
 
   useEffect(() => {
+    const socket = io("http://localhost:4000");
+
+    socket.on("connect", () => {
+      console.log("✅ Connected to WebSocket");
+    });
+
+    socket.on("ticket-updated", (data) => {
+      console.log("⚡ LIVE UPDATE:", data);
+
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === data.ticketId
+            ? {
+                ...t,
+                status: data.status ?? t.status,
+                category: data.category ?? t.category,
+                aiConfidence: data.aiConfidence ?? t.aiConfidence,
+              }
+            : t,
+        ),
+      );
+    });
+
+    socket.on("disconnect", () => {
+      console.log("❌ Disconnected from WebSocket");
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
     fetchTickets();
-    const interval = setInterval(fetchTickets, 3000);
+  }, [status]);
+
+  useEffect(() => {
+    const interval = setInterval(fetchTickets, 15000); // 15s fallback
     return () => clearInterval(interval);
   }, [status]);
 
