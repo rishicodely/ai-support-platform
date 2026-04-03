@@ -16,7 +16,7 @@ load_dotenv()
 app = FastAPI()
 
 EXCHANGE = "support.events"
-QUEUE = "ai.queue"
+QUEUE = "ai.queue.v2"
 RETRY_QUEUE = "ai.retry.queue"
 DLQ = "ai.dlq"
 
@@ -120,7 +120,7 @@ def start_consumer():
             },
         )
 
-        channel.queue_bind(exchange=EXCHANGE, queue=QUEUE, routing_key="ticket.created")
+        channel.queue_bind(exchange=EXCHANGE, queue=QUEUE, routing_key="ticket.*")
 
     except Exception as e:
         print("🔥 RABBIT INIT FAILED:", e)
