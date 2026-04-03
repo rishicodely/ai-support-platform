@@ -1,3 +1,4 @@
+from email.mime import text
 import json
 import os
 import urllib.parse
@@ -6,6 +7,7 @@ from fastapi import FastAPI
 import threading
 import random
 from dotenv import load_dotenv
+import re
 from groq import Groq
 
 load_dotenv()
@@ -17,46 +19,46 @@ QUEUE = "ai.queue"
 RETRY_QUEUE = "ai.retry.queue"
 DLQ = "ai.dlq"
 
-client = Groq(apiKey=os.getenv("GROQ_API_KEY"))
-
 from groq import Groq
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 def classify_with_groq(text: str):
     response = client.chat.completions.create(
-        model="llama3-8b-8192",  # fast + good enough
+        model="llama3-8b-8192",
         messages=[
             {
                 "role": "system",
                 "content": """
 You are a support ticket classifier.
 
-Classify the ticket into one of:
+Classify into:
 billing, account, technical, urgent, general
 
-Return ONLY JSON in this format:
-{
-  "category": "string",
-  "confidence": number (0 to 1)
-}
+Return ONLY JSON:
+{"category": "...", "confidence": 0.0}
 """
             },
-            {
-                "role": "user",
-                "content": text
-            }
+            {"role": "user", "content": text}
         ],
         temperature=0
     )
 
     content = response.choices[0].message.content
 
+    print("🚀 USING GROQ")
+    print("RAW:", content)
+
     try:
+        # ✅ remove markdown formatting
+        content = re.sub(r"```json|```", "", content).strip()
+
         result = json.loads(content)
+
         return result["category"], float(result["confidence"])
-    except Exception:
-        # fallback if parsing fails
+
+    except Exception as e:
+        print("❌ PARSE ERROR:", e)
         return "general", 0.5
 
 def start_consumer():
@@ -165,7 +167,7 @@ def start_consumer():
                 category, confidence = classify_with_groq(subject)
             except Exception:
                 category, confidence = "general", 0.5
-                
+
             print(f"[AI_PIPELINE] ticket={event['aggregate_id']} category={category} confidence={confidence}")
 
             publish_ai_processed(event, category, confidence)
