@@ -1,5 +1,7 @@
 import json
 import os
+from unicodedata import category
+from unittest import result
 import urllib.parse
 import pika
 from fastapi import FastAPI
@@ -36,8 +38,11 @@ You are a support ticket classifier.
 Classify into:
 billing, account, technical, urgent, general
 
-Return ONLY JSON:
-{"category": "...", "confidence": 0.0}
+Respond ONLY with valid JSON.
+No explanation, no extra text.
+
+Example:
+{"category": "billing", "confidence": 0.92}
 """
             },
             {"role": "user", "content": text}
@@ -51,17 +56,31 @@ Return ONLY JSON:
     print("RAW:", content)
 
     try:
-        # ✅ remove markdown formatting
         content = re.sub(r"```json|```", "", content).strip()
 
-        result = json.loads(content)
+        print("CLEANED:", content)
 
-        return result["category"], float(result["confidence"])
+        json_match = re.search(r"\{.*\}", content, re.DOTALL)
+
+        if not json_match:
+            raise Exception("No JSON found")
+
+        json_str = json_match.group(0)
+
+        result = json.loads(json_str)
+
+        category = result.get("category", "general")
+        confidence = float(result.get("confidence", 0.5))
+
+        print("FINAL PARSED:", category, confidence)
+
+        return category, confidence
 
     except Exception as e:
         print("❌ PARSE ERROR:", e)
+        print("BAD CONTENT:", content)
         return "general", 0.5
-
+    
 def start_consumer():
     try:
         url = os.getenv("RABBITMQ_URL")
@@ -163,10 +182,6 @@ def start_consumer():
             
             print("AI Service received:", event["event_type"])
             print(f"[RETRY {retry_count}] Processing ticket {event['aggregate_id']}")
-
-            # simulate failure
-            if random.random() < 0.3:  # 30% failure
-                raise Exception("Simulated AI failure")
 
             # extract subject
             subject = event.get("payload", {}).get("subject", "")
