@@ -6,6 +6,7 @@ from fastapi import FastAPI
 import threading
 import random
 from dotenv import load_dotenv
+from groq import Groq
 
 load_dotenv()
 
@@ -16,25 +17,47 @@ QUEUE = "ai.queue"
 RETRY_QUEUE = "ai.retry.queue"
 DLQ = "ai.dlq"
 
-def classify_ticket(text: str):
-    text = text.lower()
+client = Groq(apiKey=os.getenv("GROQ_API_KEY"))
 
-    # if "payment" in text or "billing" in text:
-    #     return "billing", 0.92
+from groq import Groq
 
-    if "payment" in text or "billing" in text or "issue" in text:
-        return "billing", 0.92
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-    if "login" in text or "password" in text:
-        return "account", 0.88
+def classify_with_groq(text: str):
+    response = client.chat.completions.create(
+        model="llama3-8b-8192",  # fast + good enough
+        messages=[
+            {
+                "role": "system",
+                "content": """
+You are a support ticket classifier.
 
-    if "error" in text or "bug" in text:
-        return "technical", 0.90
+Classify the ticket into one of:
+billing, account, technical, urgent, general
 
-    if "urgent" in text or "asap" in text:
-        return "urgent", 0.95
+Return ONLY JSON in this format:
+{
+  "category": "string",
+  "confidence": number (0 to 1)
+}
+"""
+            },
+            {
+                "role": "user",
+                "content": text
+            }
+        ],
+        temperature=0
+    )
 
-    return "general", 0.70
+    content = response.choices[0].message.content
+
+    try:
+        result = json.loads(content)
+        return result["category"], float(result["confidence"])
+    except Exception:
+        # fallback if parsing fails
+        return "general", 0.5
 
 def start_consumer():
     url = os.getenv("RABBITMQ_URL")
@@ -138,8 +161,11 @@ def start_consumer():
             subject = event.get("payload", {}).get("subject", "")
 
             # classify
-            category, confidence = classify_ticket(subject)
-
+            try:
+                category, confidence = classify_with_groq(subject)
+            except Exception:
+                category, confidence = "general", 0.5
+                
             print(f"[AI_PIPELINE] ticket={event['aggregate_id']} category={category} confidence={confidence}")
 
             publish_ai_processed(event, category, confidence)

@@ -5,6 +5,8 @@ import amqp from "amqplib";
 import { Server } from "socket.io";
 import http from "http";
 
+const PORT = process.env.PORT || 4000;
+
 const EXCHANGE = process.env.EXCHANGE || "support.events";
 const QUEUE = process.env.QUEUE || "ws.queue";
 
@@ -51,7 +53,7 @@ async function start() {
       ticketId: event.aggregate_id,
       status: event.payload?.status,
       category: event.payload?.category,
-      aiConfidence: event.payload?.aiConfidence,
+      aiConfidence: event.payload?.confidence,
     };
 
     io.emit("ticket-updated", normalizedEvent);
@@ -68,8 +70,8 @@ async function start() {
     });
   });
 
-  server.listen(4000, () => {
-    console.log("WebSocket server running on port 4000");
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log("WebSocket server running on port", PORT);
   });
 }
 
