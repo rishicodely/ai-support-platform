@@ -27,8 +27,9 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 def classify_with_groq(text: str):
+    print("🚀 USING GROQ")
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="llama-3.1-8b-instant",
         messages=[
             {
                 "role": "system",
@@ -39,7 +40,8 @@ Classify into:
 billing, account, technical, urgent, general
 
 Respond ONLY with valid JSON.
-No explanation, no extra text.
+Do NOT include any text before or after JSON.
+Do NOT use markdown.
 
 Example:
 {"category": "billing", "confidence": 0.92}
@@ -56,11 +58,13 @@ Example:
     print("RAW:", content)
 
     try:
-        content = re.sub(r"```json|```", "", content).strip()
-
+        content = re.sub(r"```.*?```", "", content, flags=re.DOTALL)
+        content = content.strip()
         print("CLEANED:", content)
 
-        json_match = re.search(r"\{.*\}", content, re.DOTALL)
+        print("🔍 FINAL CONTENT BEFORE PARSE:", content)
+
+        json_match = re.search(r"\{[^{}]*\}", content, re.DOTALL)
 
         if not json_match:
             raise Exception("No JSON found")
@@ -70,7 +74,7 @@ Example:
         result = json.loads(json_str)
 
         category = result.get("category", "general")
-        confidence = float(result.get("confidence", 0.5))
+        confidence = float(result.get("confidence", 0.5) or 0.5)
 
         print("FINAL PARSED:", category, confidence)
 
@@ -105,7 +109,7 @@ def start_consumer():
             durable=True,
             arguments={
                 "x-dead-letter-exchange": EXCHANGE,
-                "x-dead-letter-routing-key": "ticket.created",
+                "x-dead-letter-routing-key": "ticket.created",                
                 "x-message-ttl": 5000,
             },
         )
@@ -120,7 +124,7 @@ def start_consumer():
             },
         )
 
-        channel.queue_bind(exchange=EXCHANGE, queue=QUEUE, routing_key="ticket.*")
+        channel.queue_bind(exchange=EXCHANGE, queue=QUEUE, routing_key="ticket.created")
 
     except Exception as e:
         print("🔥 RABBIT INIT FAILED:", e)
@@ -154,6 +158,12 @@ def start_consumer():
     def callback(ch, method, properties, body):
         try:
             event = json.loads(body)
+
+            if event.get("event_type") != "ticket.created":
+                print("⛔ Ignored:", event.get("event_type"))
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+                return
+            
             headers = properties.headers or {}
             x_death = headers.get("x-death", [])
             retry_count = x_death[0]["count"] if x_death else 0
@@ -184,13 +194,11 @@ def start_consumer():
             print(f"[RETRY {retry_count}] Processing ticket {event['aggregate_id']}")
 
             # extract subject
-            subject = event.get("payload", {}).get("subject", "")
+            payload = event.get("payload", {})
+            subject = payload.get("subject") or payload.get("title") or ""
 
             # classify
-            try:
-                category, confidence = classify_with_groq(subject)
-            except Exception:
-                category, confidence = "general", 0.5
+            category, confidence = classify_with_groq(subject)
 
             print(f"[AI_PIPELINE] ticket={event['aggregate_id']} category={category} confidence={confidence}")
 
