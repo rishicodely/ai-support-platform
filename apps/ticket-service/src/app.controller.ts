@@ -5,6 +5,7 @@ import {
   Get,
   Query,
   BadRequestException,
+  Delete,
 } from '@nestjs/common';
 import { CreateTicketDto } from './tickets/dto/create-ticket.dto';
 import { PrismaService } from './prisma/prisma.service';
@@ -61,5 +62,11 @@ export class AppController {
         createdAt: 'desc',
       },
     });
+  }
+
+  @Delete('tickets')
+  async clearTickets() {
+    await this.prisma.ticket.deleteMany();
+    return { message: 'All tickets cleared' };
   }
 }
