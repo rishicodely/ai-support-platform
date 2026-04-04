@@ -24,10 +24,10 @@ function App() {
   const fetchTickets = async () => {
     const url =
       status === "ALL"
-        ? // ? "https://ticket-service-nx7h.onrender.com/tickets"
-          // : `https://ticket-service-nx7h.onrender.com/tickets?status=${status}`;
-          "http://localhost:3002/tickets"
-        : `http://localhost:3002/tickets?status=${status}`;
+        ? "https://ticket-service-nx7h.onrender.com/tickets"
+        : `https://ticket-service-nx7h.onrender.com/tickets?status=${status}`;
+    //   "http://localhost:3002/tickets"
+    // : `http://localhost:3002/tickets?status=${status}`;
 
     const res = await fetch(url);
     const data = await res.json();
@@ -35,8 +35,8 @@ function App() {
   };
 
   useEffect(() => {
-    // const socket = io("https://websocket-service-05k8.onrender.com", {
-    const socket = io("http://localhost:4000");
+    const socket = io("https://websocket-service-05k8.onrender.com");
+    // const socket = io("http://localhost:4000");
     socket.on("connect", () => {
       console.log("✅ Connected to WebSocket");
     });
@@ -83,8 +83,8 @@ function App() {
     try {
       setLoading(true);
 
-      // await fetch("https://ticket-service-nx7h.onrender.com/tickets", {
-      await fetch("http://localhost:3002/tickets", {
+      await fetch("https://ticket-service-nx7h.onrender.com/tickets", {
+        // await fetch("http://localhost:3002/tickets", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
