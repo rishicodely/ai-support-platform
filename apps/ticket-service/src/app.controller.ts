@@ -42,6 +42,7 @@ export class AppController {
       tenant_id: 'default-tenant',
       timestamp: new Date().toISOString(),
       payload: {
+        status: ticket.status,
         subject: ticket.subject,
         priority: ticket.priority,
       },

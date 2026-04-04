@@ -43,27 +43,43 @@ export class AIConsumer implements OnModuleInit {
 
       try {
         const event = JSON.parse(msg.content.toString());
+        const ticketId = event.aggregate_id;
 
         console.log('Ticket Service received:', event.event_type);
 
-        const ticketId = event.aggregate_id;
+        const existing = await this.prisma.ticket.findUnique({
+          where: { id: ticketId },
+        });
 
-        // ✅ HANDLE FAILURE FIRST
-        if (event.event_type === 'ticket.ai_failed') {
-          await this.prisma.ticket.update({
-            where: { id: ticketId },
-            data: {
-              status: 'FAILED',
-            },
-          });
-
-          console.log(`Ticket ${ticketId} marked FAILED`);
-
+        if (!existing) {
+          console.log('Ticket not found');
           this.channel.ack(msg);
           return;
         }
 
-        // ✅ SUCCESS CASE
+        if (event.event_type === 'ticket.ai_failed') {
+          await this.prisma.ticket.update({
+            where: { id: ticketId },
+            data: { status: 'FAILED' },
+          });
+
+          console.log(`Ticket ${ticketId} marked FAILED`);
+          this.channel.ack(msg);
+          return;
+        }
+
+        if (event.event_type !== 'ticket.ai_processed') {
+          console.log('Ignored event:', event.event_type);
+          this.channel.ack(msg);
+          return;
+        }
+
+        if (existing.status === 'CLASSIFIED') {
+          console.log('Already classified');
+          this.channel.ack(msg);
+          return;
+        }
+
         const category = event?.payload?.category ?? null;
         const confidence = event?.payload?.confidence ?? null;
 
@@ -76,12 +92,11 @@ export class AIConsumer implements OnModuleInit {
           },
         });
 
-        console.log(`Ticket ${ticketId} updated with AI result`);
+        console.log(`Ticket ${ticketId} updated`);
 
         this.channel.ack(msg);
       } catch (err) {
         console.error('Failed to process AI result', err);
-
         this.channel.nack(msg, false, true);
       }
     });

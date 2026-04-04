@@ -10,6 +10,7 @@ export type EventEnvelope = {
   tenant_id: string;
   timestamp: string;
   payload: {
+    status: string;
     subject: string;
     priority: string;
   };

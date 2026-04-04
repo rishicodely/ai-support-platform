@@ -140,6 +140,7 @@ def start_consumer():
             "timestamp": event["timestamp"],
             "version": 1,
             "payload": {
+                "status": "CLASSIFIED",
                 "category": category,
                 "confidence": confidence
             }
